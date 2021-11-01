@@ -1,0 +1,143 @@
+---
+title: "Analysis on eSports Tournament Winnings"
+author: "Will Massey"
+date: "10/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(skimr)
+
+```
+
+# Purpose
+
+With the rise of popularity in eSports, we found a public dataset on eSports earnings in professional tournaments to analyze. We have a few questions to answer, including:  
+
+* Which games have earned the most?
+* Who are the top competing teams?
+* Which countries have the best players?
+* What genres of games are the most popular for tournaments?
+
+
+# Data Preparation
+
+```{r}
+
+# reading from csv
+country_codes = read.csv("data/country-codes.csv")
+players = read.csv("data/highest_earning_players.csv")
+teams = read.csv("data/highest_earning_teams.csv")
+
+# joining country names to country codes
+players$CountryCode = toupper(players$CountryCode)
+players = left_join(players, select(country_codes, Country_Name, Two_Letter_Country_Code), 
+                    by = c("CountryCode" = "Two_Letter_Country_Code"))
+
+# quick statistics 
+skim(players)
+skim(teams)
+
+```
+
+# The Analysis
+
+First, let's gain some insight into which games are earning the most. We will begin plotting total tournament earnings by each game. 
+
+```{r}
+
+total_earnings_per_game = players %>% group_by(Game) %>% summarise_at(vars(TotalUSDPrize), sum)
+
+ggplot(data = total_earnings_per_game, aes(x = reorder(Game, TotalUSDPrize), y = TotalUSDPrize, fill = TotalUSDPrize)) + 
+  geom_bar(stat = "identity", color = "black") + 
+  labs(title = "Total Tournament Earnings per Game", y = "Total Earned (USD)", x = "Game") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "none") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+Dota 2, CS:GO, and Fortnite take the cake for the most earning all time, however which games have the best average earning per tournament? We will plot the average earnings each player receives by the game they play.
+
+```{r}
+
+avg_earnings_per_game = players %>% group_by(Game) %>% summarise_at(vars(TotalUSDPrize), mean)
+
+ggplot(data = avg_earnings_per_game, aes(x = reorder(Game, TotalUSDPrize), y = TotalUSDPrize, fill = TotalUSDPrize)) + 
+  geom_bar(stat = "identity", color = "black") + 
+  labs(title = "Average Player Earnings by Game", y = "Average of Earnings (USD)", x = "Game") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "none") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+Dota 2, CS:GO, and Fortnite also have the most average payouts per player on average. 
+
+Next, we will see which teams have earned the most, as well as the number of tournaments they have been paid out from. 
+
+```{r fig.width=12, fig.height=8}
+
+top_earning_teams = teams %>% arrange(desc(TotalUSDPrize)) %>% slice(1:50)
+ggplot(data = top_earning_teams, aes(x = reorder(TeamName, TotalUSDPrize), y = TotalUSDPrize, fill = Game)) + 
+  geom_bar(stat = "identity", color = "black") + 
+  labs(title = "Top Teams With the Most Earnings in Tournaments", x = "Team", y = "Total Earnings (USD)") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "bottom") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma) + 
+  scale_fill_brewer(palette="Set2")
+
+```
+```{r fig.width=12, fig.height=8}
+
+most_playing_teams = teams %>% arrange(desc(TotalTournaments)) %>% slice(1:50)
+ggplot(data = most_playing_teams, aes(x = reorder(TeamName, TotalTournaments), y = TotalTournaments, fill = Game)) + 
+  geom_bar(stat = "identity", color = "black") + 
+  labs(title = "Top Teams With Most Placements in Tournaments", x = "Team", y = "Number of Placements") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "bottom") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma) + 
+  scale_fill_brewer(palette="Set2")
+
+```
+
+OG, Evil Geniuses, and Team Liquid have the most total tournament winnings with at least $20 million each. Team Liquid is also in the top three teams who who placed most in professional tournaments, right alongside ROOT Gaming and mousesports. This is a good opportunity to see how well each country stacks up against one another, so let's plot the total earnings of each country's players.
+
+```{r fig.width=12, fig.height=8}
+
+earnings_by_country = players %>% group_by(Country_Name) %>% summarise_at(vars(TotalUSDPrize), sum) %>% arrange(desc(TotalUSDPrize))
+
+ggplot(data = earnings_by_country, aes(x=reorder(Country_Name, TotalUSDPrize), y=TotalUSDPrize, fill=TotalUSDPrize)) + 
+  geom_bar(stat = "identity", color="black") + 
+  labs(title = "Total Tournament Winnings by Country", x = "Country", y = "Total Earned (USD)") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "none") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+China, Korea, and the United States by far take the lead in the total amount of earnings their players receive from tournaments. 
+
+Let's move on to game genres and how much tournament winnings each has gotten.
+
+```{r}
+
+genres = players %>% group_by(Genre) %>% summarize_at(vars(TotalUSDPrize), sum) %>% arrange(desc(TotalUSDPrize))
+
+ggplot(data = genres, aes(x=reorder(Genre, TotalUSDPrize), y=TotalUSDPrize, fill=TotalUSDPrize)) + 
+  geom_bar(stat = "identity", color="black") + 
+  labs(title = "Total Tournament Winnings by Genre", x = "Genre of Game", y = "Total Earned (USD)") + 
+  theme(axis.text.x = element_text(angle = 0), legend.position = "none") + coord_flip() + 
+  scale_y_continuous(labels = scales::comma)
+
+```
+
+As expected, MOBA games like Dota and League of Legends are the top earning genres in professional tournaments, whereas card games and strategy games earn considerably less. 
+
+# Conclusion 
+
+* Dota and CS:GO pay the most for tournament winnings, with Fortnite and League of Legends following behind.
+* OG, Evil Geniuses, and Team Liquid have the most tournament winnings of all time
+* Team Liquid, ROOT Gaming, and mousesports have placed in the most tournaments that pay out
+* China, Korea, and the United States are dominating the world with the most tournament winnings per country. 
+* Multiplayer Online Battle Arena and First-Person_Shooter genres are the most payed out genres in professional tournaments. 
+
+Note: The dataset we collected was approximately 10 months old, leaving room for error as eSports having gotten a fair bit more popular this year. We plan to update the dataset and reperform the analysis at a later time.
